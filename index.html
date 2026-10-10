@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Plan your Durga Puja Parikrama route across Kolkata. Discover 270+ pandals, get optimized walking routes, and coordinate with friends in real-time.">
+  <meta name="theme-color" content="#d92525">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪔</text></svg>">
+
+  <!-- Open Graph / WhatsApp Preview -->
+  <meta property="og:title" content="Durga Puja Parikrama - Kolkata's Ultimate Guide">
+  <meta property="og:description" content="Plan your Puja route across 270+ pandals with smart navigation and group coordination.">
+  <meta property="og:type" content="website">
+
+  <title>Durga Puja Parikrama</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="style.css?v=16" />
+</head>
+<body>
+
+<!-- USER PROFILE MODAL -->
+    <div id="profile-modal-overlay" class="modal-overlay" onclick="window.closeProfileModal()"></div>
+    <div id="profile-modal" class="center-modal">
+        <div style="text-align: center; padding: 15px;">
+            <!-- Profile Picture (Hidden until loaded via Google) -->
+            <img id="profile-avatar" src="" style="width: 80px; height: 80px; border-radius: 50%; margin-bottom: 10px; display: none; object-fit: cover; border: 2px solid #d92525; margin-left: auto; margin-right: auto;">
+            
+            <!-- Fallback Icon if they used Email/Password -->
+            <div id="profile-fallback" style="width: 80px; height: 80px; border-radius: 50%; background: #fff5f5; color: #d92525; border: 2px solid #d92525; line-height: 80px; font-size: 2.5rem; display: none; margin: 0 auto 10px auto;">👤</div>
+            
+            <h2 id="profile-name" style="font-family: 'Fraunces', serif; color: #333; margin-bottom: 5px;">Loading...</h2>
+            <p id="profile-email" style="font-size: 0.9rem; color: #777; margin-bottom: 25px;">...</p>
+            
+            <div class="pill-action-row">
+                <button class="pill-action-btn outline" onclick="window.closeProfileModal()">Close</button>
+                <button class="pill-action-btn" style="background: #333; color: white; border: none;" onclick="window.logOutUser()">Log Out</button>
+            </div>
+        </div>
+    </div>
+
+  <!-- SPLASH SCREEN -->
+  <div id="splash-screen" style="z-index: 9999999; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s ease;">
+    <!-- Muted, playsinline, and autoplay inline so mobile browsers don't trap it -->
+    <video id="splash-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: 1;">
+      <source src="splash_screen.mp4" type="video/mp4">
+    </video>
+    <div class="splash-content" style="position: relative; z-index: 2; text-align: center; color: white;">
+      <h1 class="splash-title" style="font-family: 'Fraunces', serif; font-size: 2rem; margin-bottom: 5px;">Durga Puja Parikrama</h1>
+      <p class="splash-subtitle" style="font-family: 'Outfit', sans-serif; font-size: 1rem; opacity: 0.8;">Kolkata's Ultimate Guide</p>
+    </div>
+  </div>
+
+  <!-- TOP COMMAND HEADER -->
+  <header id="app-header">
+    <div class="header-left">
+      <div id="map-title">
+        <h1 style="font-size: 1.2rem; margin-bottom: 0; white-space: nowrap;">Durga Puja Parikrama</h1>
+        <p id="count-label" style="font-size: 0.75rem; margin: 0; white-space: nowrap;">Loading...</p>
+      </div>
+    </div>
+    
+    <div class="header-center" style="display: flex; gap: 10px; align-items: center;">
+      <!-- 1. The Solo / Group Toggle -->
+      <div class="mode-toggle-pill">
+        <button id="mode-solo" class="active" onclick="exitGroupMode()">Solo</button>
+        <button id="mode-group" onclick="handleGroupToggle()">Group <span style="font-size: 0.75rem; margin-left:2px;">✨</span></button>
+      </div>
+      
+      <!-- 2. NEW: Metro Mode Toggle -->
+      <div id="metro-mode-pill" class="metro-toggle-pill" onclick="toggleMetroMode()">
+        <span class="metro-icon">🚇</span>
+        <span class="metro-text">Metro</span>
+        <div class="toggle-switch">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="header-right">
+      <div id="start-pill-box" class="glass-pill">
+        <div id="start-closed-ui" onclick="toggleStartPill()">
+          <span style="font-size: 1.1rem;">📍</span>
+          <span id="start-pill-text">Where to start?</span>
+        </div>
+        <div id="start-expanded-ui">
+          <div class="pill-action-row">
+            <button class="pill-action-btn" onclick="useCurrentLocation()">🎯 Current Location</button>
+            <button class="pill-action-btn outline" onclick="enableMapSelection()">📍 Choose on Map</button>
+          </div>
+          <div class="search-box-wrapper">
+            <input type="text" id="custom-start-input" placeholder="Search area in Kolkata..." autocomplete="off" oninput="handleLiveSearch(event)">
+          </div>
+          <ul id="location-results">
+            <li style="color: #94a3b8; text-align: center; pointer-events: none; border: none; padding-top: 15px;">Search results will appear here</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- FLOATING HUBBA DASHBOARD -->
+  <div id="active-hubbas-section" class="hubba-collapsed">
+    <div id="hubba-widget-header" onclick="toggleHubbaWidget()" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h3 style="font-family: 'Fraunces', serif; font-size: 1.1rem; color: #d92525; margin: 0; padding-left: 5px;">🤝 My Active Hubbas</h3>
+      <span id="hubba-toggle-icon" style="color: #d92525; font-size: 0.9rem; transition: transform 0.3s; pointer-events: none;">▼</span>
+    </div>
+    <div id="my-groups-container" style="display: flex; flex-direction: column; gap: 8px;">
+      <div class="hubba-group-card">
+        <div class="hubba-info">
+          <span class="hubba-name">🔥 Ashtami Night Squad</span>
+          <span class="hubba-members">4 Members • 3 Pandals Drafted</span>
+        </div>
+        <div class="hubba-card-actions">
+          <button class="hubba-icon-btn" title="Edit Room">✏️</button>
+          <button class="hubba-icon-btn delete" title="Delete Room">🗑️</button>
+          <button class="open-hubba-btn" onclick="openHubbaSheet()">Open</button>
+        </div>
+      </div>
+    </div> 
+  </div> 
+
+  <!-- MAP ZONE -->
+  <div id="map-container">
+    <div id="map"></div>
+    <div class="map-fab-container">
+      <button id="locate-btn" class="map-fab" onclick="startLocationTracking()" title="Find My Location">
+        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
+          <path d="M440-42v-80q-125-14-214.5-103.5T122-440H42v-80h80q14-125 103.5-214.5T440-838v-80h80v80q125 14 214.5 103.5T838-520h80v80h-80q-14 125-103.5 214.5T520-122v80h-80Zm40-158q116 0 198-82t82-198q0-116-82-198t-198-82q-116 0-198 82t-82 198q0 116 82 198t198 82Zm0-120q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47Z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="map-picking-instruction" class="map-picking-overlay">
+    Tap anywhere on the map to set your starting point
+  </div>
+
+  <!-- THE NEW CINEMATIC TOOLTIP -->
+  <div id="proposal-guidance-tooltip">✨ Propose pandals from here</div>
+
+<!-- THE MISSING LOGIN SCREEN MODAL -->
+<div id="auth-overlay" style="z-index: 999998; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #fdfbf7; backdrop-filter: none;">
+    <div style="text-align: center; max-width: 340px; width: 90%; background: #ffffff; padding: 30px 25px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); position: relative;">
+        <h2 id="auth-title" style="font-family: 'Fraunces', serif; color: #d92525; margin-top: 0; margin-bottom: 5px; font-size: 1.8rem;">Join Parikrama</h2>
+        <p id="auth-subtitle" style="font-size: 0.9rem; color: #555; margin-bottom: 20px;">Save your routes, intel, and ratings.</p>
+
+        <input type="text" id="auth-name" placeholder="Display Name (e.g., Rahul)" style="width: 100%; padding: 14px; margin-bottom: 12px; border-radius: 10px; border: 1px solid #ddd; font-family: 'Outfit'; font-size: 1rem; outline: none; box-sizing: border-box; background: #fafafa; color: #333;">
+        
+        <input type="email" id="auth-email" placeholder="Email Address" style="width: 100%; padding: 14px; margin-bottom: 12px; border-radius: 10px; border: 1px solid #ddd; font-family: 'Outfit'; font-size: 1rem; outline: none; box-sizing: border-box; background: #fafafa; color: #333;">
+        
+        <input type="password" id="auth-pass" placeholder="Password (Min 6 chars)" style="width: 100%; padding: 14px; margin-bottom: 20px; border-radius: 10px; border: 1px solid #ddd; font-family: 'Outfit'; font-size: 1rem; outline: none; box-sizing: border-box; background: #fafafa; color: #333;">
+
+        <button id="auth-action-btn" style="background: #d92525; color: white; border: none; width: 100%; padding: 14px; font-size: 1.1rem; border-radius: 10px; font-family: 'Outfit'; font-weight: 600; cursor: pointer; box-shadow: 0 4px 10px rgba(217,37,37,0.3);" onclick="window.submitAuth()">Sign Up</button>
+        
+        <div style="margin: 18px 0; color: #aaa; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <span style="height: 1px; background: #eee; flex: 1;"></span>OR<span style="height: 1px; background: #eee; flex: 1;"></span>
+        </div>
+        
+        <button id="google-auth-btn" style="background: white; color: #333; border: 1px solid #ccc; width: 100%; padding: 14px; font-size: 1.05rem; border-radius: 10px; font-family: 'Outfit'; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);" onclick="window.signInWithGoogle()">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 20px;" alt="Google">
+            Continue with Google
+        </button>
+
+        <p id="auth-toggle-text" style="font-size: 0.9rem; margin-top: 25px; cursor: pointer; color: #d92525; font-weight: 700; margin-bottom: 0;" onclick="window.toggleAuthMode()">Already have an account? Log In</p>
+    </div>
+</div>
+
+  <!-- THE EXPLORE PANEL (Sidebar) -->
+  <div id="sidebar" class="explore-panel">
+    
+    <div class="toran-border"></div>
+    <div id="drag-area">
+      <div class="drag-handle"></div>
+    </div>
+    
+   <!-- UNIVERSAL SEARCH BAR -->
+    <div class="search-container" id="search-container">
+      <input type="text" id="search-box" placeholder="🔍 Search pandals..." onkeyup="handleUniversalSearch(event)">
+      
+      <!-- Metro Results Dropdown (Pure CSS Glassmorphism) -->
+      <ul id="metro-search-results" style="display: none; position: absolute; top: calc(100% + 8px); left: 15px; right: 15px; z-index: 3001; max-height: 240px; overflow-y: auto; list-style: none;"></ul>
+    </div>
+
+    <!-- EXISTING PANDAL CATEGORY FILTERS -->
+    <div id="filter-chip-container" class="panel-filters">
+      <button class="filter-chip active" onclick="applyFilter(this, 'All', 'All')">🌍 All Kolkata</button>
+      <button class="filter-chip" onclick="applyFilter(this, 'North', 'All')">🧭 North</button>
+      <button class="filter-chip" onclick="applyFilter(this, 'South', 'All')">🧭 South</button>
+      <button class="filter-chip" onclick="applyFilter(this, 'Central', 'All')">🧭 Central</button>
+      <button class="filter-chip" onclick="applyFilter(this, 'East', 'All')">🧭 East</button>
+      <button class="filter-chip" onclick="applyFilter(this, 'Behala', 'All')">🧭 Behala</button>
+      <div class="chip-divider"></div>
+      <button class="filter-chip" onclick="applyFilter(this, 'All', 'Bonedi Bari')">🏰 Bonedi Bari</button>
+      <button class="filter-chip" onclick="applyFilter(this, 'All', 'Sarbojanin')">🎪 Sarbojanin</button>
+      <button class="filter-chip" onclick="applyFilter(this, 'All', 'Housing Puja')">🏘️ Housing</button>
+    </div>
+
+    <!-- NEW METRO LINE FILTERS -->
+    <div id="metro-line-filters" class="panel-filters metro-line-filters" style="display: none;">
+      <button class="filter-chip" style="border-color: #0ea5e9; color: #0ea5e9;" onclick="highlightMetroLine('blue')">🔵 Blue</button>
+      <button class="filter-chip" style="border-color: #2ecc71; color: #2ecc71;" onclick="highlightMetroLine('green')">🟢 Green</button>
+      <button class="filter-chip" style="border-color: #ff9800; color: #ff9800;" onclick="highlightMetroLine('orange')">🟠 Orange</button>
+      <button class="filter-chip" style="border-color: #9b59b6; color: #9b59b6;" onclick="highlightMetroLine('purple')">🟣 Purple</button>
+      <button class="filter-chip" style="border-color: #f1c40f; color: #b48512;" onclick="highlightMetroLine('yellow')">🟡 Yellow</button>
+    </div>
+
+    <div class="panel-content">
+      <ul id="pandal-list"></ul>
+
+      <div id="itinerary-panel" style="display: none;">
+        <h2 style="font-family: 'Fraunces', serif; font-size: 1.2rem; margin-bottom: 10px; color: #d92525;">Your Smart Route</h2>
+        <div id="itinerary-content"></div>
+        <div class="itinerary-actions">
+          <button class="reset-btn" onclick="resetApp()">Start Over</button>
+          <button class="share-btn" onclick="openShareModal()">📤 Share Plan</button>
+          <button id="download-pass-btn" onclick="downloadOfflinePass()">📥 Save Offline Pass</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- THE FLOATING PILL BUTTONS (Moved out of scrolling container) -->
+    <div id="proposal-action-bar">
+      <button id="cancel-proposal-btn" type="button" onclick="window.cancelProposalMode()">← Back to chat</button>
+      <button id="generate-route-btn" onclick="showDisclaimerModal()">Plan Route (0)</button>
+    </div>
+  </div>
+
+  <!-- THE NEW FULL-PAGE GROUPS HUB -->
+  <div id="mobile-groups-page" style="display: none;">
+    <div class="groups-page-header">
+      <h2 style="font-family: 'Fraunces', serif; color: #d92525; margin: 0; font-size: 1.8rem;">My Hubbas</h2>
+      <p style="font-size: 0.9rem; color: #7a1b26; margin-top: 5px;">Manage your Puja squads</p>
+    </div>
+    
+    <div class="groups-page-content" style="padding: 16px;">
+      <button class="create-room-main-btn" onclick="openHubbaModal()">
+        <span>🎪</span> Create or Join a Room
+      </button>
+
+      <h3 class="groups-section-title">Active Squads</h3>
+      <!-- Active groups will be cloned here dynamically -->
+      <div id="mobile-groups-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+    </div>
+  </div>
+
+  <!-- THE NEW FULL-PAGE ROUTES VAULT -->
+  <div id="mobile-routes-page" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background: #fdfbf7; z-index: 4500; overflow-y: auto; padding-bottom: 90px;">
+    <div class="groups-page-header">
+      <h2 style="font-family: 'Fraunces', serif; color: #d92525; margin: 0; font-size: 1.8rem;">Route Vault</h2>
+      <p style="font-size: 0.9rem; color: #7a1b26; margin-top: 5px;">Your saved offline itineraries</p>
+    </div>
+    
+    <div class="groups-page-content" style="padding: 16px;">
+      <!-- Vault Mode Toggle (Reusing your sleek Hubba Tab CSS!) -->
+      <div class="hubba-tab-container" style="margin: 0 0 15px 0; max-width: 100%; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        <div id="vault-tab-slider" class="tab-slider chat-active" style="transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);"></div>
+        <button id="vault-btn-solo" class="hubba-tab-btn active" onclick="window.switchVaultTab('solo')">👤 Solo Routes</button>
+        <button id="vault-btn-group" class="hubba-tab-btn" onclick="window.switchVaultTab('group')">🤝 Group Routes</button>
+      </div>
+
+      <!-- Filter & Sort Row -->
+      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <select id="vault-sort-select" onchange="window.renderMobileRoutes()" style="flex: 1; padding: 10px; border-radius: 12px; border: 1px solid #e2e8f0; background: #fff; color: #4a0e17; font-family: inherit; font-size: 0.9rem; outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
+          <option value="latest">Sort: Latest First</option>
+          <option value="oldest">Sort: Oldest First</option>
+        </select>
+        <select id="vault-filter-select" onchange="window.renderMobileRoutes()" style="display: none; flex: 1; padding: 10px; border-radius: 12px; border: 1px solid #e2e8f0; background: #fff; color: #4a0e17; font-family: inherit; font-size: 0.9rem; outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
+          <option value="all">All Hubbas</option>
+          <!-- Dynamically populated -->
+        </select>
+      </div>
+
+      <!-- Route Cards Render Here -->
+      <div id="mobile-routes-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+    </div>
+  </div>
+
+  <!-- SOS FULL-PAGE -->
+  <div id="mobile-sos-page" style="display: none;">
+    <div class="groups-page-header">
+      <h2 style="font-family: 'Fraunces', serif; color: #d92525; margin: 0; font-size: 1.8rem;">🚨 Emergency SOS</h2>
+      <p style="font-size: 0.9rem; color: #7a1b26; margin-top: 5px;">Stay safe during Parikrama</p>
+    </div>
+
+    <div class="sos-page-content">
+      <!-- GREEN PILL — Pharmacies Near Me -->
+      <button class="sos-pill sos-pill-green" onclick="findNearestPharmacy()">
+        <span class="sos-pill-glow"></span>
+        <span class="sos-pill-icon">💊</span>
+        <span class="sos-pill-label">Pharmacies Near Me</span>
+        <span class="sos-pill-arrow">→</span>
+      </button>
+
+      <!-- RED PILL — Dial 100 -->
+      <button class="sos-pill sos-pill-red" onclick="initiateDial100()">
+        <span class="sos-pill-glow"></span>
+        <span class="sos-pill-icon">📞</span>
+        <span class="sos-pill-label">Dial 100</span>
+        <span class="sos-pill-sub">Police Helpline</span>
+        <span class="sos-pill-arrow">→</span>
+      </button>
+    </div>
+
+    <!-- 3-second Countdown Overlay for Dial 100 -->
+    <div id="sos-dial-overlay" class="sos-dial-overlay">
+      <div class="sos-dial-card">
+        <div class="sos-dial-ring">
+          <svg viewBox="0 0 120 120">
+            <circle class="sos-ring-bg" cx="60" cy="60" r="54"/>
+            <circle id="sos-ring-progress" class="sos-ring-fill" cx="60" cy="60" r="54"/>
+          </svg>
+          <span id="sos-countdown-number" class="sos-countdown-number">3</span>
+        </div>
+        <p class="sos-dial-text">Calling <strong>100</strong> in...</p>
+        <button class="sos-cancel-btn" onclick="cancelDial100()">✕ Cancel</button>
+      </div>
+    </div>
+  </div>
+
+<!-- ========================================== -->
+  <!-- RESTORED PILL NAVIGATION BAR -->
+  <!-- ========================================== -->
+  <style>
+    /* Hides any old CSS conflicts */
+    #bottom-nav { display: none !important; }
+    
+    #parikrama-pill-nav {
+      position: fixed; 
+      bottom: 2px; 
+      left: 5%; 
+      width: 90vw; 
+      height: 70px; 
+      background: #ffffff; 
+      border: 1px solid rgba(212, 175, 55, 0.4);
+      border-radius: 40px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      padding: 0 5px; 
+      z-index: 5000; 
+      box-sizing: border-box;
+    }
+    .pill-tab {
+      position: relative; 
+      z-index: 2; 
+      flex: 1; 
+      background: transparent; 
+      border: none; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      justify-content: center; 
+      height: 100%;
+      cursor: pointer; 
+      color: #888888;
+      font-family: 'Outfit', sans-serif; 
+      transition: color 0.3s ease;
+      -webkit-tap-highlight-color: transparent; 
+      outline: none;
+    }
+    .pill-tab .tab-icon { font-size: 1.3rem; transition: transform 0.2s ease; margin-bottom: 2px; }
+    .pill-tab:active .tab-icon { transform: scale(0.9); }
+    .pill-tab .tab-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+  </style>
+
+  <nav id="parikrama-pill-nav">
+    <!-- The Restored Sliding Background Pill -->
+    <div id="magic-nav-slider" style="position: absolute; top: 5px; height: 60px; width: calc((90vw - 10px) / 5); background: #fff5f5; border-radius: 30px; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 1; transform: translateX(0%); left: 5px;"></div>
+
+    <button class="pill-tab" id="nav-btn-map" onclick="showMapPage()" style="color: #d92525;">
+      <span class="tab-icon">🗺️</span>
+      <span class="tab-label">Map</span>
+    </button>
+
+    <button class="pill-tab" id="nav-btn-groups" onclick="showGroupsPage()">
+      <span class="tab-icon">🤝</span>
+      <span class="tab-label">Groups</span>
+    </button>
+
+    <button class="pill-tab" id="nav-btn-routes" onclick="showRoutesPage()">
+      <span class="tab-icon">🚶</span>
+      <span class="tab-label">Route</span>
+    </button>
+
+    <!-- PROFILE TAB -->
+    <button class="pill-tab" id="nav-btn-profile" onclick="showProfilePage()">
+      <img id="nav-profile-img" src="" style="width: 24px; height: 24px; border-radius: 50%; display: none; object-fit: cover; border: 2px solid #d92525;">
+      <div id="nav-profile-fallback" style="width: 24px; height: 24px; border-radius: 50%; background: #e2e8f0; color: #475569; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800;">👤</div>
+      <span class="tab-label">Profile</span>
+    </button>
+
+    <!-- SOS TAB -->
+    <button class="pill-tab" id="nav-btn-sos" onclick="showSOSPage()" style="color: #d92525;">
+      <span class="tab-icon">🚨</span>
+      <span class="tab-label">SOS</span>
+    </button>
+  </nav>
+
+  <!-- NEW FULL-PAGE PROFILE VIEW -->
+  <div id="mobile-profile-page" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background: #fdfbf7; z-index: 4500; overflow-y: auto; padding-bottom: 90px;">
+    <div class="groups-page-header">
+      <h2 style="font-family: 'Fraunces', serif; color: #d92525; margin: 0; font-size: 1.8rem;">My Profile</h2>
+      <p style="font-size: 0.9rem; color: #7a1b26; margin-top: 5px;">Manage your account</p>
+    </div>
+    
+    <div id="profile-page-content" style="padding: 16px;">
+      <!-- PLACEHOLDER FOR YOUR FUTURE CONTENT -->
+      <div style="text-align: center; padding: 40px 20px; color: #888;">
+         <span style="font-size: 3rem; display: block; margin-bottom: 10px;">🛠️</span>
+         <p>Profile features coming soon...</p>
+         
+         <button style="background: #d92525; color: white; border: none; width: 100%; padding: 14px; font-size: 1.1rem; border-radius: 10px; font-family: 'Outfit'; font-weight: 600; cursor: pointer; box-shadow: 0 4px 10px rgba(217,37,37,0.3); margin-top: 30px;" onclick="window.logOutUser()">Log Out</button>
+      </div>
+    </div>
+  </div>
+  
+ <!-- METRO MODE LEGEND & SEARCH -->
+  <div id="metro-legend" class="glass-legend" style="display: none;">
+    
+    <!-- THE SEARCH BAR -->
+    <div class="metro-search-wrapper">
+      <input type="text" id="metro-search-box" placeholder="🔍 Search station..." oninput="handleMetroSearch()" autocomplete="off">
+      <ul id="metro-search-results"></ul>
+    </div>
+
+    <div style="font-size: 0.75rem; font-weight: 700; color: #7a1b26; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Kolkata Metro Network</div>
+    <div class="metro-line-filters">
+      <button class="metro-line-btn" data-line="blue" onclick="highlightMetroLine('blue')"><span class="line-dot" style="background:#0ea5e9; box-shadow: 0 0 8px #0ea5e9;"></span> Blue</button>
+      <button class="metro-line-btn" data-line="green" onclick="highlightMetroLine('green')"><span class="line-dot" style="background:#2ecc71; box-shadow: 0 0 8px #2ecc71;"></span> Green</button>
+      <button class="metro-line-btn" data-line="orange" onclick="highlightMetroLine('orange')"><span class="line-dot" style="background:#ff9800; box-shadow: 0 0 8px #ff9800;"></span> Orange</button>
+      <button class="metro-line-btn" data-line="purple" onclick="highlightMetroLine('purple')"><span class="line-dot" style="background:#9b59b6; box-shadow: 0 0 8px #9b59b6;"></span> Purple</button>
+      <button class="metro-line-btn" data-line="yellow" onclick="highlightMetroLine('yellow')"><span class="line-dot" style="background:#f1c40f; box-shadow: 0 0 8px #f1c40f;"></span> Yellow</button>
+    </div>
+    <div style="font-size: 0.7rem; color: #d92525; margin-top: 10px; font-weight: bold; text-align: center;">🌙 Puja Special Night Service</div>
+  </div>
+
+  <!-- MODALS -->
+  <div id="share-modal-overlay" class="modal-overlay" onclick="closeShareModal()"></div>
+  <div id="share-modal" class="center-modal">
+    <h3>Share Your Parikrama</h3>
+    <p style="font-size: 0.85rem; color: #7a1b26; margin-bottom: 10px;">Send this exact route to your friends so they can follow along!</p>
+    <button class="whatsapp-btn" onclick="shareToWhatsApp()">💬 Send via WhatsApp</button>
+    <button class="copy-btn" id="copy-btn-el" onclick="copyRouteLink()">🔗 Copy Link</button>
+    <button class="pill-action-btn outline" style="margin-top: 5px;" onclick="closeShareModal()">Cancel</button>
+  </div>
+
+  <!-- LIVE INTEL MOBILE MODAL -->
+    <div id="intel-modal-overlay" class="modal-overlay" onclick="closeIntelModal()"></div>
+    <div id="intel-modal" class="center-modal">
+      <h2 style="font-family: 'Fraunces', serif; color: #d92525; margin-bottom: 5px;">📢 Live Intel</h2>
+      <p id="intel-modal-subtitle" style="font-size: 0.85rem; color: #7a1b26; margin-bottom: 15px; font-weight: 600;">Report crowd status or secret routes.</p>
+      
+      <input type="hidden" id="intel-safekey" value="">
+      <textarea id="intel-input-box" placeholder="e.g. 'Main road blocked by police! Enter through the back alley near the sweet shop...'" style="width: 100%; height: 80px; padding: 10px; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.5); font-family: 'Outfit'; font-size: 0.9rem; resize: none; outline: none; margin-bottom: 15px;"></textarea>
+      
+      <div class="pill-action-row">
+        <button class="pill-action-btn outline" onclick="closeIntelModal()">Cancel</button>
+        <button id="intel-submit-btn" class="pill-action-btn" style="background: #d92525; color: white; border: none;" onclick="submitIntel()">Broadcast Info</button>
+      </div>
+    </div>
+
+  <div id="disclaimer-modal-overlay" class="modal-overlay" onclick="closeDisclaimerModal()"></div>
+  <div id="disclaimer-modal" class="center-modal">
+    <div style="font-size: 2.5rem; margin-bottom: 5px;">⚠️</div>
+    <h3>Important Notice</h3>
+    <p style="font-size: 0.9rem; color: #4a0e17; margin-bottom: 20px; line-height: 1.5;">📍 Pin locations are estimated and may not reflect the exact pedestrian entry gates.<br><br>Always follow local police barricades and verify routes locally during the festival.</p>
+    <div style="display: flex; gap: 10px;">
+      <button class="pill-action-btn outline" onclick="closeDisclaimerModal()">Cancel</button>
+      <button class="whatsapp-btn" style="flex: 2; background: #d92525; box-shadow: 0 4px 10px rgba(217, 37, 37, 0.3);" onclick="proceedToRoute()">Continue 🚀</button>
+    </div>
+  </div>
+
+  <div id="hubba-modal-overlay" class="modal-overlay" onclick="closeHubbaModal()"></div>
+  <div id="hubba-modal" class="center-modal" style="width: 90%; max-width: 380px; padding: 25px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(15px); border: 1px solid rgba(217, 37, 37, 0.2); border-radius: 20px; box-shadow: 0 10px 30px rgba(74, 14, 23, 0.2);">
+    <button onclick="closeHubbaModal()" style="position: absolute; top: 15px; right: 15px; background: rgba(217,37,37,0.1); color: #d92525; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; transition: background 0.2s;">✕</button>
+    
+    <div style="text-align: center; margin-bottom: 25px; margin-top: 5px;">
+      <h2 style="font-family: 'Fraunces', serif; color: #d92525; margin-bottom: 5px; font-size: 1.8rem;">Hubba Rooms</h2>
+      <p style="font-size: 0.9rem; color: #7a1b26; margin: 0;">Map your Parikrama route together!</p>
+    </div>
+
+    <div id="hubba-view-tiles" style="display: flex; flex-direction: column; gap: 15px;">
+      <button onclick="switchHubbaView('create')" style="display: flex; align-items: center; gap: 15px; width: 100%; background: #fff; border: 1px solid #ffe3e3; padding: 16px; border-radius: 16px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.04); text-align: left; font-family: inherit;">
+        <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(217, 37, 37, 0.1); color: #d92525; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0;">🎪</div>
+        <div>
+          <strong style="display: block; color: #7a1b26; font-size: 1.1rem; margin-bottom: 4px;">Create a Room</strong>
+          <span style="display: block; color: #888; font-size: 0.85rem;">Get a code to invite friends</span>
+        </div>
+      </button>
+      <button onclick="switchHubbaView('join')" style="display: flex; align-items: center; gap: 15px; width: 100%; background: #fff; border: 1px solid #ffe3e3; padding: 16px; border-radius: 16px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.04); text-align: left; font-family: inherit;">
+        <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); color: #b48512; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0;">🤝</div>
+        <div>
+          <strong style="display: block; color: #7a1b26; font-size: 1.1rem; margin-bottom: 4px;">Join via Code</strong>
+          <span style="display: block; color: #888; font-size: 0.85rem;">Enter a friend's room code</span>
+        </div>
+      </button>
+    </div>
+
+   <div id="hubba-view-create" style="display: none; flex-direction: column; gap: 15px;">
+      <p style="font-size: 0.9rem; color: #555; text-align: center; margin: 0;">You will host this room as <strong><span id="hubba-host-name-display"></span></strong>.</p>
+      <button style="background: #d92525; color: #fff; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(217, 37, 37, 0.3); font-family: inherit; font-size: 1rem;" onclick="generateRoom()">Generate Room</button>
+      <div id="hubba-generated-code-box" style="display:none; text-align: center; background: #fff9e6; border: 1px dashed #d4af37; padding: 15px; border-radius: 12px; margin-top: 5px;">
+        <span style="font-size: 0.8rem; color: #7a1b26;">Share this code:</span>
+        <h2 id="hubba-display-code" style="letter-spacing: 4px; color: #d92525; margin: 5px 0; font-size: 2.2rem; font-family: 'Outfit', sans-serif;">---</h2>
+        <button style="background: #25D366; color: #fff; border: none; padding: 12px; border-radius: 8px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 1rem; font-family: inherit;" id="ui-btn-share" onclick="shareHubbaToWhatsApp()">💬 Share to WhatsApp</button>
+      </div>
+      <button style="background: transparent; color: #d92525; border: 1px solid rgba(217,37,37,0.3); padding: 12px; border-radius: 12px; font-weight: bold; cursor: pointer; font-family: inherit; margin-top: 5px;" onclick="switchHubbaView('tiles')">← Back</button>
+    </div>
+
+    <div id="hubba-view-join" style="display: none; flex-direction: column; gap: 15px;">
+      <p style="font-size: 0.9rem; color: #555; text-align: center; margin: 0;">You will join this room as <strong><span id="hubba-join-name-display"></span></strong>.</p>
+      <input type="text" id="hubba-join-code" style="width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 1.2rem; color: #4a0e17; text-align: center; letter-spacing: 4px; font-weight: bold; text-transform: uppercase; font-family: inherit;" placeholder="6-DIGIT CODE" maxlength="6">
+      <button style="background: #d92525; color: #fff; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(217, 37, 37, 0.3); font-family: inherit; font-size: 1rem; margin-top: 5px;" onclick="joinRoomViaCode()">Join Room</button>
+      <button style="background: transparent; color: #d92525; border: 1px solid rgba(217,37,37,0.3); padding: 12px; border-radius: 12px; font-weight: bold; cursor: pointer; font-family: inherit;" onclick="switchHubbaView('tiles')">← Back</button>
+    </div>
+
+  <!-- HUBBA BOTTOM SHEET -->
+  <div id="hubba-sheet-overlay" class="modal-overlay" onclick="window.closeHubbaSheet()"></div>
+  
+  <div id="hubba-bottom-sheet" class="hubba-sheet-container">
+    <div class="hubba-drag-handle-wrapper">
+      <div class="drag-handle"></div>
+    </div>
+
+    <!-- Sheet Header -->
+    <div class="hubba-sheet-header">
+      <button id="desktop-routes-pin" class="desktop-only-btn" onclick="window.toggleRouteHistory()">📍Routes</button>
+      <button class="hubba-close-btn" onclick="window.closeHubbaSheet()">✕</button>
+      <h2 id="dashboard-group-name">Room Name</h2>
+      <span class="hubba-code-badge">CODE: <span id="dashboard-group-code">---</span></span>
+      
+      <div class="hubba-tab-container">
+        <div id="hubba-tab-slider" class="tab-slider chat-active"></div>
+        <button id="tab-btn-chat" class="hubba-tab-btn active" onclick="window.switchHubbaTab('chat')">💬 Chat & Vote</button>
+        <button id="tab-btn-plan" class="hubba-tab-btn" onclick="window.switchHubbaTab('plan')">📝 Route Draft</button>
+      </div>
+    </div>
+
+    <!-- CHAT WORKSPACE -->
+    <div id="hubba-workspace-chat" class="hubba-workspace">
+      
+      <!-- THE PRECISION PILL -->
+      <div id="hubba-pill-container" class="pill-state-center">
+        <button id="hubba-dynamic-pill" onclick="window.openPandalSearch()">
+          <span class="pill-glow-dot"></span>
+          <span class="pill-text-content">
+            <strong id="dynamic-pill-title">Make a Plan</strong>
+            <span id="dynamic-pill-subtext" class="pill-subtext">Propose pandals to the group</span>
+          </span>
+          <span class="pill-arrow">→</span>
+        </button>
+      </div>
+
+      <div id="hubba-chat-messages" class="chat-messages-container"></div>
+
+      <div class="chat-input-row">
+        <input type="text" id="hubba-chat-input" placeholder="Argue here...">
+        <button onclick="window.sendHubbaMessage()">➤</button>
+      </div>
+    </div>
+
+    <!-- PLAN WORKSPACE -->
+    <div id="hubba-workspace-plan" class="hubba-workspace" style="display: none;">
+      <button id="plan-start-btn" onclick="window.openHubbaStartPicker()">
+        📍 Add Starting Point
+      </button>
+      <h3>Approved Pandals</h3>
+      <div id="plan-final-list"></div>
+      <button class="draw-route-btn" onclick="window.executeFinalPlan()">🗺️ Draw Group Route</button>
+    </div>
+
+    <!-- ROUTE HISTORY OVERLAY ONLY -->
+    <div id="hubba-route-history-panel" class="route-history-panel">
+      <div class="search-panel-header">
+        <strong>🕰 Route Archive</strong>
+        <button onclick="window.toggleRouteHistory()">✕</button>
+      </div>
+      <div id="route-history-list" class="history-list"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js?v=17"></script>
+  <script type="module" src="hubba.js?v=17"></script>
+  <script>
+  window.addEventListener('click', function(e) {
+      if (e.target.closest('.create-room-main-btn')) {
+          const myName = window.currentUser ? (window.currentUser.displayName || "Explorer") : "Explorer";
+          document.getElementById('hubba-host-name-display').innerText = myName;
+          document.getElementById('hubba-join-name-display').innerText = myName;
+      }
+  });
+</script>
+</body>
+</html>
